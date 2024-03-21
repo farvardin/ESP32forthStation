@@ -3,6 +3,8 @@ Stand alone Forth computer with LillyGo TTGO VGA32 single board computer and ESP
 
 ---
 
+**<!> This version updated to ESP32forth v7.0.7.18 is not working <!>**
+
 Based on the work of several open source projects (see below) it was possible to make the _ESP32forthStation_. It is a single board Forth computer with keyboard (PS/2), video monitor (VGA) and networking capabilities (WiFi). It can be used as a complete development environment for your own experiments.
 
 ![ESP32fortStation setup on a table including keyboard and monitor](img/ESP32forthStation.jpg "")
