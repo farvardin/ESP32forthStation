@@ -1500,7 +1500,10 @@ defer key?
 defer terminate
 : bye   0 terminate ;
 : emit ( n -- ) >r rp@ 1 type rdrop ;
-: space bl emit ;   : cr 13 emit nl emit ;
+: space bl emit ;   
+defer cr
+: (cr) nl emit ; ' (cr) is cr
+: cr00 13 emit nl emit ;
 
 ( Numeric Output )
 variable hld
@@ -1563,7 +1566,7 @@ variable echo -1 echo !   variable arrow -1 arrow !  0 value wascr
 : eat-till-cr   begin *key dup 13 = if ?echo exit else drop then again ;
 : accept ( a n -- n ) ?arrow. 0 swap begin 2dup < while
      *key
-     dup 13 = if ?echo drop nip exit then
+     dup 13 = if drop space drop nip exit then
      dup 8 = over 127 = or if
        drop over if rot 1- rot 1- rot 8 ?echo bl ?echo 8 ?echo then
      else
@@ -3195,18 +3198,19 @@ void fabGL_setup() {
    // Terminal.loadFont(&fabgl::FONT_6x8);
    Terminal.enableCursor(true);
    Terminal.keyboard()->setLayout(&fabgl::FrenchLayout);
+   // Terminal.printf("\e[33m Hello");  // just for testing
 }
 #endif
 
 void setup() {
-#ifdef ENABLE_FABGL_SUPPORT
-  fabGL_setup();
-#endif
   cell_t fh = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   cell_t hc = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   if (fh - hc < MINIMUM_FREE_SYSTEM_HEAP) {
     hc = fh - MINIMUM_FREE_SYSTEM_HEAP;
   }
+  #ifdef ENABLE_FABGL_SUPPORT
+  fabGL_setup();
+#endif
   cell_t *heap = (cell_t *) malloc(hc);
   forth_init(0, 0, heap, hc, boot, sizeof(boot));
 }
