@@ -21,9 +21,8 @@
  * Revision: aa69b6841264a8e8874c60665e5938ea99b3532c
  */
 
-/* modified by farvardin 2024-04-16 */
-/* and Wintermute_BBS https://github.com/ufud-org/ueforth/blob/VGA32/ueforth/esp32/template.ino */
-
+/* modified by Wintermute_BBS https://github.com/ufud-org/ueforth/blob/VGA32/ueforth/esp32/template.ino */
+/* and farvardin 2024-04-16 */
 
 
 
@@ -1512,11 +1511,11 @@ defer terminate
 : bye   0 terminate ;
 : emit ( n -- ) >r rp@ 1 type rdrop ;
 : space bl emit ;   
-defer cr
-: (cr) nl emit ; ' (cr) is cr
-: cr00 13 emit nl emit ;
+\ defer cr
+\ : (cr) nl emit ; ' (cr) is cr
+\ : cr00 13 emit nl emit ;
 
-\ : cr 13 emit nl emit ;
+: cr 13 emit nl emit ;
 
 ( Numeric Output )
 variable hld
@@ -1579,8 +1578,8 @@ variable echo -1 echo !   variable arrow -1 arrow !  0 value wascr
 : eat-till-cr   begin *key dup 13 = if ?echo exit else drop then again ;
 : accept ( a n -- n ) ?arrow. 0 swap begin 2dup < while
      *key
-     dup 13 = if drop space drop nip exit then
-\      dup 13 = if ?echo drop nip exit then
+\     dup 13 = if drop space drop nip exit then
+      dup 13 = if ?echo drop nip exit then
      dup 8 = over 127 = or if
        drop over if rot 1- rot 1- rot 8 ?echo bl ?echo 8 ?echo then
      else
@@ -2502,11 +2501,11 @@ forth definitions ansi
 : bg ( n -- ) esc ." [48;5;" n. ." m" ;
 : normal   esc ." [0m" ;
 : at-xy ( x y -- ) esc ." [" 1+ n. ." ;" 1+ n. ." H" ;
-DEFINED? Terminal.clear [IF]
-: page   Terminal.clear ;
-[ELSE]
+\ DEFINED? Terminal.clear [IF]
+\ : page   Terminal.clear ;
+\ [ELSE]
 : page   esc ." [2J" esc ." [H" ;
-[THEN]
+\ [THEN]
 : set-title ( a n -- ) esc ." ]0;" type bel ;
 forth
 ( Lazy loaded visual editor. )
@@ -2661,31 +2660,6 @@ previous previous previous previous current ! visual
 | evaluate ;
 ( Add a yielding task so pause yields )
 internals definitions
-
-: arduino-cr ( -- ) nl emit ;
-' arduino-cr is cr
-: arduino-bye   0 terminate ;
-' arduino-bye is bye
-: arduino-type ( a n -- ) Serial.write drop ;
-' arduino-type is type
-: arduino-key ( -- n )
-   begin Serial.available until 0 >r rp@ 1 Serial.readBytes drop r> ;
-' arduino-key is key
-: arduino-key? ( -- n ) Serial.available ;
-' arduino-key? is key?
-
-DEFINED? Terminal.write [IF]
-: terminal-cr ( -- ) nl emit 13 emit ;
-' terminal-cr is cr
-: terminal-type ( a n -- )  Terminal.write drop ;
-' terminal-type is type
-: terminal-key ( -- n )  Terminal.read ;
-' terminal-key is key
-: terminal-key? ( -- n ) Terminal.available ;
-' terminal-key? is key?
-[THEN]
-
-
 : yield-step   raw-yield yield ;
 ' yield-step 100 100 task yield-task
 yield-task start-task
@@ -2717,7 +2691,7 @@ DEFINED? Terminal.write [IF]
 ' default-type is type
 ' default-key is key
 ' default-key? is key?
-' raw-terminate is terminate
+\ ' raw-terminate is terminate
 only forth definitions
 
 also ledc also serial also SPIFFS
