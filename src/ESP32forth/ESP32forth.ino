@@ -1,4 +1,6 @@
 /*  ESP32 Forth Station  */ 
+/* for Lilygo TTGO VGA32 1.4 */
+/*  works with arduino IDE 2.1.1 and  esp32 2.0.11 by Espressif  */ 
 /*
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,12 +17,24 @@
 */
 
 /*
- * ESP32forth v7.0.7.18
+ * with ESP32forth v7.0.7.18
  * Revision: aa69b6841264a8e8874c60665e5938ea99b3532c
  */
 
+/* modified by farvardin 2024-04-16 */
+/* and Wintermute_BBS https://github.com/ufud-org/ueforth/blob/VGA32/ueforth/esp32/template.ino */
 
 
+
+
+// Uncomment this #define for stand alone termminal mode using the
+// FabGL (http://www.fabglib.org/) library
+// You will need to install FabGL from the Library Manager:
+#define ENABLE_FABGL_SUPPORT
+
+#ifdef ENABLE_FABGL_SUPPORT
+#include <fabgl.h>
+#endif
 
 #if defined(CONFIG_IDF_TARGET_ESP32)
 # define UEFORTH_PLATFORM_IS_ESP32 (-1)
@@ -76,20 +90,6 @@
 #define ENABLE_LEDC_SUPPORT
 #define ENABLE_SD_SUPPORT
 #define ENABLE_ESP32_FORTH_FAULT_HANDLING
-
-// Uncomment this #define for stand alone termminal mode using the
-// FabGL (http://www.fabglib.org/) library
-// You will need to install FabGL from the Library Manager:
-
-#define ENABLE_FABGL_SUPPORT
-
-#ifdef ENABLE_FABGL_SUPPORT
-#include "fabgl.h"
-fabgl::VGATextController DisplayController;
-fabgl::PS2Controller     PS2Controller;
-fabgl::Terminal          Terminal;
-#endif
-
 
 // SD_MMC does not work on ESP32-S2 / ESP32-C3
 #if !defined(CONFIG_IDF_TARGET_ESP32S2) && !defined(CONFIG_IDF_TARGET_ESP32C3)
@@ -150,6 +150,19 @@ fabgl::Terminal          Terminal;
 # define UEFORTH_PLATFORM_HAS_PSRAM 0
 #endif
 
+#ifdef ENABLE_FABGL_SUPPORT
+#define VOCABULARY_LIST \
+  V(forth) V(internals) \
+  V(rtos) V(SPIFFS) V(serial) V(terminal) V(SD) V(SD_MMC) V(ESP) \
+  V(ledc) V(Wire) V(WiFi) V(sockets) \
+  OPTIONAL_CAMERA_VOCABULARY \
+  OPTIONAL_BLUETOOTH_VOCABULARY \
+  OPTIONAL_INTERRUPTS_VOCABULARIES \
+  OPTIONAL_OLED_VOCABULARY \
+  OPTIONAL_RMT_VOCABULARY \
+  OPTIONAL_SPI_FLASH_VOCABULARY \
+  USER_VOCABULARIES
+#else
 #define VOCABULARY_LIST \
   V(forth) V(internals) \
   V(rtos) V(SPIFFS) V(serial) V(SD) V(SD_MMC) V(ESP) \
@@ -161,7 +174,7 @@ fabgl::Terminal          Terminal;
   OPTIONAL_RMT_VOCABULARY \
   OPTIONAL_SPI_FLASH_VOCABULARY \
   USER_VOCABULARIES
-  
+#endif
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -566,9 +579,6 @@ static cell_t *forth_run(cell_t *init_rp);
 #  define OPTIONAL_OLED_SUPPORT
 # endif
 
-
-
-  
 // Hook to pull in optional ESP32-CAM camera support.
 # if __has_include("camera.h")
 #  include "camera.h"
@@ -613,6 +623,7 @@ static cell_t ResizeFile(cell_t fd, cell_t size);
   REQUIRED_MEMORY_SUPPORT \
   REQUIRED_SERIAL_SUPPORT \
   OPTIONAL_SERIAL2_SUPPORT \
+  REQUIRED_TERMINAL_SUPPORT \
   REQUIRED_ARDUINO_GPIO_SUPPORT \
   REQUIRED_SYSTEM_SUPPORT \
   REQUIRED_FILES_SUPPORT \
@@ -679,6 +690,17 @@ static cell_t ResizeFile(cell_t fd, cell_t size);
   X("MS-TICKS", MS_TICKS, PUSH millis()) \
   XV(internals, "RAW-YIELD", RAW_YIELD, yield()) \
   XV(internals, "RAW-TERMINATE", RAW_TERMINATE, ESP.restart())
+
+#ifdef ENABLE_FABGL_SUPPORT
+fabgl::PS2Controller PS2Controller;
+fabgl::VGA2Controller DisplayController;
+fabgl::Terminal Terminal;
+#define REQUIRED_TERMINAL_SUPPORT \
+  XV(terminal, "Terminal.available", TERMINAL_AVAILABLE, PUSH Terminal.available()) \
+  XV(terminal, "Terminal.write", TERMINAL_WRITE, n0 = Terminal.write(b1, n0); NIP) \
+  XV(terminal, "Terminal.read", TERMINAL_READ, PUSH Terminal.read()) \
+  XV(terminal, "Terminal.flush", TERMINAL_FLUSH, Terminal.flush())
+#endif
 
 #define REQUIRED_SERIAL_SUPPORT \
   XV(serial, "Serial.begin", SERIAL_BEGIN, Serial.begin(tos); DROP) \
@@ -801,17 +823,6 @@ static cell_t ResizeFile(cell_t fd, cell_t size);
   YV(rtos, xTaskCreatePinnedToCore, n0 = xTaskCreatePinnedToCore((TaskFunction_t) a6, \
         c5, n4, a3, (UBaseType_t) n2, (TaskHandle_t *) a1, (BaseType_t) n0); NIPn(6)) \
   YV(rtos, xPortGetCoreID, PUSH xPortGetCoreID())
-#endif
-
-
-#ifndef ENABLE_FABGL_SUPPORT
-# define OPTIONAL_FABGL_SUPPORT
-#else
-# define OPTIONAL_FABGL_SUPPORT \
-   X("Terminal.write", TERMINAL_WRITE, n0 = Terminal.write(b1, n0); NIP) \
-   X("Terminal.clear", TERMINAL_CLEAR, Terminal.clear()) \
-   X("Terminal.read", TERMINAL_READ, PUSH Terminal.read()) \
-   X("Terminal.available", TERMINAL_AVAILABLE, PUSH Terminal.available()) 
 #endif
 
 #ifndef ENABLE_SOCKETS_SUPPORT
@@ -1505,6 +1516,8 @@ defer cr
 : (cr) nl emit ; ' (cr) is cr
 : cr00 13 emit nl emit ;
 
+\ : cr 13 emit nl emit ;
+
 ( Numeric Output )
 variable hld
 : pad ( -- a ) here 80 + ;
@@ -1567,6 +1580,7 @@ variable echo -1 echo !   variable arrow -1 arrow !  0 value wascr
 : accept ( a n -- n ) ?arrow. 0 swap begin 2dup < while
      *key
      dup 13 = if drop space drop nip exit then
+\      dup 13 = if ?echo drop nip exit then
      dup 8 = over 127 = or if
        drop over if rot 1- rot 1- rot 8 ?echo bl ?echo 8 ?echo then
      else
@@ -1792,6 +1806,10 @@ forth definitions
 
 vocabulary Serial   Serial definitions
 transfer Serial-builtins
+forth definitions
+
+vocabulary Terminal  Terminal definitions
+transfer Terminal-builtins
 forth definitions
 
 vocabulary sockets   sockets definitions
@@ -2679,6 +2697,13 @@ internals definitions also serial
 : serial-key ( -- n )
    begin pause Serial.available until 0 >r rp@ 1 Serial.readBytes drop r> ;
 : serial-key? ( -- n ) Serial.available ;
+internals definitions also terminal
+: terminal-type ( a n -- ) Terminal.write drop ;
+: terminal-key ( -- n )
+   begin pause Terminal.available until Terminal.read ;
+: terminal-key? ( -- n ) Terminal.available ;
+
+
 also forth definitions
 DEFINED? Terminal.write [IF]
 : default-type terminal-type ;
@@ -3171,7 +3196,6 @@ static cell_t ResizeFile(cell_t fd, cell_t size) {
   if (t < 0) { return errno; }
   return 0;
 }
-
 #ifdef ENABLE_FABGL_SUPPORT
 void print_info() {
    Terminal.write("\e[37m* * FabGL - Loopback VT/ANSI Terminal\r\n");
@@ -3184,17 +3208,24 @@ void print_info() {
 }
 
 void fabGL_setup() {
+  /*
+  PS2Controller.begin(PS2Preset::KeyboardPort0);
+  DisplayController.begin();
+  DisplayController.setResolution(VGA_640x480_60Hz);
+  Terminal.begin(&DisplayController);
+  Terminal.connectLocally();
+  Terminal.enableCursor(true);
+  */
+
    PS2Controller.begin(PS2Preset::KeyboardPort0);
    DisplayController.begin();
-   DisplayController.setResolution();
+   DisplayController.setResolution(VGA_640x480_60Hz);
    Terminal.begin(&DisplayController);
    Terminal.connectLocally();      // to use Terminal.read(), available(), etc..
    Terminal.setBackgroundColor(Color::Black);
    Terminal.setForegroundColor(Color::White);
    Terminal.clear();
    // print_info();
-   Terminal.setBackgroundColor(Color::Black);
-   Terminal.setForegroundColor(Color::White);
    // Terminal.loadFont(&fabgl::FONT_6x8);
    Terminal.enableCursor(true);
    Terminal.keyboard()->setLayout(&fabgl::FrenchLayout);
@@ -3203,14 +3234,15 @@ void fabGL_setup() {
 #endif
 
 void setup() {
+#ifdef ENABLE_FABGL_SUPPORT
+  fabGL_setup();
+  // print_info();
+#endif
   cell_t fh = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
   cell_t hc = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   if (fh - hc < MINIMUM_FREE_SYSTEM_HEAP) {
     hc = fh - MINIMUM_FREE_SYSTEM_HEAP;
   }
-  #ifdef ENABLE_FABGL_SUPPORT
-  fabGL_setup();
-#endif
   cell_t *heap = (cell_t *) malloc(hc);
   forth_init(0, 0, heap, hc, boot, sizeof(boot));
 }
